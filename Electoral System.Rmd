@@ -1,0 +1,569 @@
+---
+title: "Using the 2024 United Kingdom General Election results to compare Electoral Systems"
+author: "Imtiaz Kidwai"
+output: html_document
+---
+
+```{css echo=FALSE}
+body {
+background-color: #ccc1a8;
+font-family: "Garamond", Times, serif;
+font-size: 16px}
+
+
+ 
+
+```
+
+```{r setup, include = FALSE}
+knitr::opts_chunk$set(warning = FALSE, message = FALSE)
+```
+
+
+
+## What is wrong with the First-Past-The-Post electoral system?
+
+The United Kingdom and Canada are among the few countries in the world that still use the first-past-the-post system in elections. This system relies on plurality voting, where one candidate wins an entire district by simply having more votes than any other candidate, regardless of the margin of victory. Australia and New Zealand are two countries that also used to conduct elections with the same system, but these countries eventually switched to more proportional means of representation due to the flaws of the FPTP system. The FPTP system consistently misrepresents voters. Consider an oversimplified example - if Candidate A wins 33% of the vote while other candidates make up the other 67% of the vote, we have a situation where Candidate A represents 100% of the district despite only 33% of voters - far less than a majority of the voting population - wanting to be represented by that candidate. 67% of voters would feel like they're not represented by the candidate they want. We can look at the 2024 British election to visualize these flaws.
+
+```{r echo=FALSE, message=FALSE}
+library(tidyverse)
+library(hextri)
+library(plotrix)
+dfz <- read_csv("data/HoC-GE2024-results-by-constituency.csv")
+df <- filter(dfz, `Country name` != "Northern Ireland")
+con_win <- filter(df, `First party` == "Con")
+con_represented <- sum(con_win$Con)
+con_total <- sum(df$Con)
+lab_win <- filter(df, `First party` == "Lab")
+lab_represented <- sum(lab_win$Lab)
+lab_total <- sum(df$Lab)
+ld_win <- filter(df, `First party` == "LD")
+ld_represented <- sum(ld_win$LD)
+ld_total <- sum(df$LD)
+gr_win <- filter(df, `First party` == "Green")
+gr_represented <- sum(gr_win$Green)
+gr_total <- sum(df$Green)
+snp_win <- filter(df, `First party` == "SNP")
+snp_represented <- sum(snp_win$SNP)
+snp_total <- sum(df$SNP)
+ruk_win <- filter(df, `First party` == "RUK")
+ruk_represented <- sum(ruk_win$RUK)
+ruk_total <- sum(df$RUK)
+pc_win <- filter(df, `First party` == "PC")
+pc_represented <- sum(pc_win$PC)
+pc_total <- sum(df$PC)
+parties <- c("LAB", "CON","PC", "SNP", "GREEN", "RUK", "LD")
+total_votes <- c(lab_total, con_total, pc_total, snp_total, gr_total,
+                 ruk_total, ld_total)
+represented_votes <- c(lab_represented, con_represented, pc_represented, 
+                      snp_represented, gr_represented, 
+                      ruk_represented, ld_represented)
+p <- c("blue", "green", "red", "orange",
+           "lightgreen", "#10d2e5", "yellow")
+votes <- data.frame(parties, total_votes, represented_votes, p)
+
+ggplot(data = votes, mapping = aes(x = reorder(parties, 1 - (represented_votes / total_votes)), y = 100 * ( 1 - (represented_votes / total_votes)), fill = parties)) + geom_bar(stat= "identity", color = "black") + scale_fill_manual(name = "Parties", values= p) + labs(x = "Parties", 
+       y = "Percentage of Voters that are not Represented in Parliament") +
+ theme(panel.background = element_rect(fill = "#ccc1a8",
+                                          colour = "#ccc1a8",
+                                          size = 0.5, linetype = "solid"),
+    panel.grid.major = element_line(colour = "black"),
+    panel.grid.minor = element_line(colour = "#3f4345")
+  )
+```
+
+
+Constituencies in Northern Ireland were omitted because of how the parties are completely different. From the graphic, we can see that other than the Labour Party, atleast half of every party's voters are represented by a different party in parliament.
+
+```{r include=FALSE}
+df <- mutate(df, non_winner = `Valid votes` - pmax(Lab, Con, PC, RUK, LD, SNP, Green, SF, SDLP, APNI, UUP, DUP))
+df <- mutate(df, winner =  pmax(Lab, Con, PC, RUK, LD, SNP, Green, SF, SDLP, APNI, UUP, DUP))
+total_non_winner <- sum(df$non_winner)
+total_valid <- sum(df$`Valid votes`)
+percent_useless <- (total_non_winner / total_valid) * 100
+```
+
+When we tally up the total votes from all the constituencies, and then remove the votes for the winning party from each constituency, we have that 57.93% of voters across the U.K (except Northern Ireland) are not represented. In a democracy, there is bound to be voters dissatisfied with the results of an election, but when over half of voters do not get representation in parliament, one may feel that the system should change. The leader of the country will never get the majority of the votes, but the division of seats in parliament should be what people voted for. The graphic below shows how that is not the case at all.
+
+```{r echo=FALSE, out.width="100%"}
+dff <- read.csv("~/British General Election 2024/data/vote share and seat share")
+cl <- c("blue", "maroon", "darkgreen", "red", "orange", "grey","lightgreen", "#10d2e5", "green", "yellow" )
+dff <- mutate(dff, difference = percent_of_seats - percent_of_votes)
+ggplot(data = dff, mapping = aes(x = party, y = difference, fill = party)) + geom_bar(stat = "identity") + scale_fill_manual(name = "Parties", values = cl) +  labs(x = "Parties", 
+       y = "Difference in Seat Share and Vote Share") +
+ theme(panel.background = element_rect(fill = "#ccc1a8",
+                                          colour = "#ccc1a8",
+                                          size = 0.5, linetype = "solid"),
+    panel.grid.major = element_line(colour = "black"),
+    panel.grid.minor = element_line(colour = "#3f4345"),
+    axis.title.x = element_text(family = "Garamond"),
+    axis.title.y = element_text(family = "Garamond"),
+    axis.text.x = element_blank()
+  )
+
+
+```
+
+
+Very few parties seem to have a negligible difference in seat share and vote share. 
+
+
+## The 2024 Election under a Closed Party - List Proportional system
+
+We will use the closed party list system because I believe that while people officially vote for candidates in their constituencies, in reality the party the candidate is from matters the most to a voter. In a closed party list, parties have a list of candidates for each constituency, and if they win n votes in a constituency, the first n candidates from the list are selected. In each constituency, there are algorithms to use the vote tallies to proportionally allocate the seats to each party. We will use the Sainte-Laguë method. 
+
+Instead of 650 different constituencies with 1 seat each, we divide the U.K into 12 constituencies. We will use the regions in the 2024 election results dataset as these constituencies. There is no other reason for me to use these regions as constituencies; in reality 12 constituencies may be far too little to meaningfully represent the electorate, and somebody with better knowledge of British politics and culture is far more qualified to determine the number of constituencies and their boundaries in a closed-list proportional system. It is just simple for me to use the regions that all the current constituencies are already divided into in the dataset. Thus, our new constituencies are London, North West, North East, South West, South East, Yorkshire and The Humber, West Midlands, East Midlands, East of England, Northern Ireland, Wales, and Scotland.
+
+
+
+Since every constituency had 1 seat, we can just take the number of constituencies in each region to determine the number of seats for each region. As a result, we will still have 650 seats in parliament. Thus, the number of seats for each 'new constituency' (region) is expressed by the table below.
+
+```{r echo=FALSE}
+london <- filter(dfz, `Region name` == "London")
+south_east <- filter(dfz, `Region name` == "South East")
+east_midlands <- filter(dfz, `Region name` == "East Midlands")
+west_midlands <- filter(dfz, `Region name` == "West Midlands")
+north_east <- filter(dfz, `Region name` == "North East")
+north_west <- filter(dfz, `Region name` == "North West")
+south_west <- filter(dfz, `Region name` == "South West")
+yorkshire <- filter(dfz, `Region name` == "Yorkshire and The Humber")
+east_of_england <- filter(dfz, `Region name` == "East of England")
+northern_ireland <- filter(dfz, `Region name` == "Northern Ireland")
+scotland <- filter(dfz, `Region name` == "Scotland")
+wales <- filter(dfz, `Region name` == "Wales")
+new_constituencies <- c("Yorkshire and The Humber", "East of England", "East Midlands", "West Midlands", "North East", "South East", "North West", "South West", "Northern Ireland", "Scotland", "Wales", "London")
+number_of_seats <- c(nrow(yorkshire), nrow(east_of_england), nrow(east_midlands), nrow(west_midlands), nrow(north_east), nrow(south_east), nrow(north_west), nrow(south_west), nrow(northern_ireland), nrow(scotland), nrow(wales), nrow(london))
+
+cons_to_seats <- data.frame(new_constituencies, number_of_seats)
+knitr::kable(x = cons_to_seats, col.names = c("New Constituencies", "Number of Seats"))
+```
+
+South East will have the most number of seats with 91, while Northern Ireland will have the least number of seats with 18. Some may use the stark difference as an argument against the division we are using here, which is why determining the right division into new constituencies would be a crucial step should the U.K ever change their electoral system.
+
+We will now use the Sainte-Laguë method on the 2024 results to assign the seats to the parties using the 2024 election results. For a party to be considered, we will establish that it must receive atleast 5% of the vote in the constituency. An important disclaimer here is that under a different electoral system, the population may vote differently. For example, somebody may vote for the Green Party under a more proportional electoral system, but under the FPTP system they may have voted for the Labour Party in 2024 to help prevent the Conservative party from winning that seat. Thus, under a different electoral system the vote share itself may have been completely different.
+
+Applying the method to the 91 seats in the South East, we get the following apportionment:
+
+```{r echo=FALSE}
+se_valid <- sum(south_east$`Valid votes`)
+se_lab <- sum(south_east$Lab)
+se_con <- sum(south_east$Con)
+se_ld <- sum(south_east$LD)
+se_gp <- sum(south_east$Green)
+se_ruk <- sum(south_east$RUK)
+se_total <- se_valid - sum(south_east$`All other candidates`)
+parties_se <- c("Labour (23)", "Conservative (29)", "Liberal Democrats (20)", "Greens (6)", "Reform UK (13)")
+votes_se <- c(se_lab, se_con, se_ld, se_gp, se_ruk)
+results_se <- table(sainte_lague(votes_se, 91))
+seats_se <- c(23, 29, 20, 6, 13)
+se <- data.frame(parties_se, seats_se, stringsAsFactors = FALSE)
+color_se <- c("red", "blue", "orange", "green", "#10d2e5")
+alpha_color_se <- c("blue", "green", "red", "orange", "#10d2e5" )
+seat_division_se <- seats(91, 7)
+se_gov <- election(seat_division_se, se, parties_se ~ seats_se, colours <- alpha_color_se)
+oldmar<-par(mar=c(2,4,4,2))
+plot(se_gov$x, se_gov$y, col = se_gov$colour, asp = 1, pch = 19, ylim = c(-2, 2.5), xlab = "", ylab = "", axes = FALSE)
+legend(-3,-0.3,parties_se,fill= color_se)
+par(oldmar)
+tab.title(label = "Seats in the South East", tab.col = "#ccc1a8")
+
+
+# knitr::kable(se, col.names = c("Parties", "Seats in the South East"))
+
+```
+
+Similarly, here are the results for the other 11 constituencies
+
+```{r echo=FALSE}
+ne_valid <- sum(north_east$`Valid votes`)
+ne_lab <- sum(north_east$Lab)
+ne_con <- sum(north_east$Con)
+ne_ld <- sum(north_east$LD)
+ne_gp <- sum(north_east$Green)
+ne_ruk <- sum(north_east$RUK)
+ne_total <- ne_valid - sum(north_east$`All other candidates`)
+parties_ne <- c("Labour (12)", "Conservative (6)", "Liberal Democrats (2)", "Greens (2)", "Reform UK (5)")
+votes_ne <- c(ne_lab, ne_con, ne_ld, ne_gp, ne_ruk)
+results_ne <- table(sainte_lague(votes_ne, 27))
+seats_ne <- c(12, 6, 2, 2, 5)
+ne <- data.frame(parties_ne, seats_ne)
+#knitr::kable(ne, col.names = c("Parties", "Seats in the North East"))
+color_ne <- c("red", "blue", "orange", "green", "#10d2e5")
+alpha_color_ne <- c("blue", "green", "red", "orange", "#10d2e5" )
+seat_division_ne <- seats(27, 3)
+ne_gov <- election(seat_division_ne,ne, parties_ne ~ seats_ne, colours <- alpha_color_ne)
+oldmar<-par(mar=c(2,4,4,2))
+plot(ne_gov$x, ne_gov$y, col = ne_gov$colour, asp = 1, pch = 19, ylim = c(-2, 2.5), xlab = "", ylab = "", axes = FALSE)
+legend(-3,-0.3,parties_ne,fill= color_ne)
+par(oldmar)
+tab.title(label = "Seats in the North East", tab.col = "#ccc1a8")
+```
+
+```{r echo=FALSE}
+nw_valid <- sum(north_west$`Valid votes`)
+nw_lab <- sum(north_west$Lab)
+nw_con <- sum(north_west$Con)
+nw_ld <- sum(north_west$LD)
+nw_gp <- sum(north_west$Green)
+nw_ruk <- sum(north_west$RUK)
+nw_total <- nw_valid - sum(north_west$`All other candidates`)
+parties_nw <- c("Labour (34)", "Conservative (15)", "Liberal Democrats (6)", "Greens (5)", "Reform UK (13)")
+votes_nw <- c(nw_lab, nw_con, nw_ld, nw_gp, nw_ruk)
+results_nw <- table(sainte_lague(votes_nw, 73))
+seats_nw <- c(34, 15, 6, 5, 13)
+nw <- data.frame(parties_nw, seats_nw)
+#knitr::kable(nw, col.names = c("Parties", "Seats in the North West"))
+color_nw <- c("red", "blue", "orange", "green", "#10d2e5")
+alpha_color_nw <- c("blue", "green", "red", "orange", "#10d2e5" )
+seat_division_nw <- seats(73, 5)
+nw_gov <- election(seat_division_nw,nw, parties_nw ~ seats_nw, colours <- alpha_color_nw)
+oldmar<-par(mar=c(2,4,4,2))
+plot(nw_gov$x, nw_gov$y, col = nw_gov$colour, asp = 1, pch = 19, ylim = c(-2, 2.5), xlab = "", ylab = "", axes = FALSE)
+legend(-3,-0.3,parties_nw,fill= color_nw)
+par(oldmar)
+tab.title(label = "Seats in the North West", tab.col = "#ccc1a8")
+```
+
+```{r echo=FALSE}
+sw_valid <- sum(south_west$`Valid votes`)
+sw_lab <- sum(south_west$Lab)
+sw_con <- sum(south_west$Con)
+sw_ld <- sum(south_west$LD)
+sw_gp <- sum(south_west$Green)
+sw_ruk <- sum(south_west$RUK)
+sw_total <- sw_valid - sum(south_west$`All other candidates`)
+parties_sw <- c("Labour (14)", "Conservative (17)", "Liberal Democrats (15)", "Greens (4)", "Reform UK (8)")
+votes_sw <- c(sw_lab, sw_con, sw_ld, sw_gp, sw_ruk)
+results_sw <- table(sainte_lague(votes_sw, 58))
+seats_sw <- c(14, 17, 15, 4, 8)
+sw <- data.frame(parties_sw, seats_sw)
+#knitr::kable(sw, col.names = c("Parties", "Seats in the South West"))
+color_sw <- c("red", "blue", "orange", "green", "#10d2e5")
+alpha_color_sw <- c("blue", "green", "red", "orange", "#10d2e5" )
+seat_division_sw <- seats(58, 4)
+sw_gov <- election(seat_division_sw,sw, parties_sw ~ seats_sw, colours <- alpha_color_sw)
+oldmar<-par(mar=c(2,4,4,2))
+plot(sw_gov$x, sw_gov$y, col = sw_gov$colour, asp = 1, pch = 19, ylim = c(-2, 2.5), xlab = "", ylab = "", axes = FALSE)
+legend(-3,-0.3,parties_sw,fill= color_sw)
+par(oldmar)
+tab.title(label = "Seats in the South West", tab.col = "#ccc1a8")
+```
+
+```{r echo=FALSE}
+ee_valid <- sum(east_of_england$`Valid votes`)
+ee_lab <- sum(east_of_england$Lab)
+ee_con <- sum(east_of_england$Con)
+ee_ld <- sum(east_of_england$LD)
+ee_gp <- sum(east_of_england$Green)
+ee_ruk <- sum(east_of_england$RUK)
+ee_total <- ee_valid - sum(east_of_england$`All other candidates`)
+parties_ee <- c("Labour (19)", "Conservative (19)", "Liberal Democrats (8)", "Greens (4)", "Reform UK (11)")
+votes_ee <- c(ee_lab, ee_con, ee_ld, ee_gp, ee_ruk)
+results_ee<- table(sainte_lague(votes_ee, 61))
+seats_ee <- c(19, 19, 8, 4, 11)
+ee <- data.frame(parties_ee, seats_ee)
+#knitr::kable(ee, col.names = c("Parties", "Seats in the East of England"))
+color_ee <- c("red", "blue", "orange", "green", "#10d2e5")
+alpha_color_ee <- c("blue", "green", "red", "orange", "#10d2e5" )
+seat_division_ee <- seats(61, 4)
+ee_gov <- election(seat_division_ee,ee, parties_ee ~ seats_ee, colours <- alpha_color_ee)
+oldmar<-par(mar=c(2,4,4,2))
+plot(ee_gov$x, ee_gov$y, col = ee_gov$colour, asp = 1, pch = 19, ylim = c(-2, 2.5), xlab = "", ylab = "", axes = FALSE)
+legend(-3,-0.3,parties_ee,fill= color_ee)
+par(oldmar)
+tab.title(label = "Seats in the East of England", tab.col = "#ccc1a8")
+```
+
+```{r echo=FALSE}
+y_valid <- sum(yorkshire$`Valid votes`)
+y_lab <- sum(yorkshire$Lab)
+y_con <- sum(yorkshire$Con)
+y_ld <- sum(yorkshire$LD)
+y_gp <- sum(yorkshire$Green)
+y_ruk <- sum(yorkshire$RUK)
+y_total <- y_valid - sum(yorkshire$`All other candidates`)
+parties_y <- c("Labour (23)", "Conservative (13)", "Liberal Democrats (4)", "Greens (4)", "Reform UK (10)")
+votes_y <- c(y_lab, y_con, y_ld, y_gp, y_ruk)
+results_y<- table(sainte_lague(votes_y, 54))
+seats_y <- c(23, 13, 4, 4, 10)
+yh <- data.frame(parties_y, seats_y)
+#knitr::kable(yh, col.names = c("Parties", "Seats in Yorkshire and The Humber"))
+color_y <- c("red", "blue", "orange", "green", "#10d2e5")
+alpha_color_y <- c("blue", "green", "red", "orange", "#10d2e5" )
+seat_division_y <- seats(54, 4)
+y_gov <- election(seat_division_y,yh, parties_y ~ seats_y, colours <- alpha_color_y)
+oldmar<-par(mar=c(2,4,4,2))
+plot(y_gov$x, y_gov$y, col = y_gov$colour, asp = 1, pch = 19, ylim = c(-2, 2.5), xlab = "", ylab = "", axes = FALSE)
+legend(-3,-0.3,parties_y,fill= color_y)
+par(oldmar)
+tab.title(label = "Seats in Yorkshire and The Humber", tab.col = "#ccc1a8")
+```
+
+```{r echo=FALSE}
+em_valid <- sum(east_midlands$`Valid votes`)
+em_lab <- sum(east_midlands$Lab)
+em_con <- sum(east_midlands$Con)
+em_ld <- sum(east_midlands$LD)
+em_gp <- sum(east_midlands$Green)
+em_ruk <- sum(east_midlands$RUK)
+em_total <- y_valid - sum(east_midlands$`All other candidates`)
+parties_em <- c("Labour (17)", "Conservative (15)", "Liberal Democrats (3)", "Greens (3)", "Reform UK (9)")
+votes_em <- c(em_lab, em_con, em_ld, em_gp, em_ruk)
+results_em<- table(sainte_lague(votes_em, 47))
+seats_em <- c(17, 15, 3, 3, 9)
+em <- data.frame(parties_em, seats_em)
+#knitr::kable(em, col.names = c("Parties", "Seats in the East Midlands"))
+color_em <- c("red", "blue", "orange", "green", "#10d2e5")
+alpha_color_em <- c("blue", "green", "red", "orange", "#10d2e5" )
+seat_division_em <- seats(47, 4)
+em_gov <- election(seat_division_em,em, parties_em ~ seats_em, colours <- alpha_color_em)
+oldmar<-par(mar=c(2,4,4,2))
+plot(em_gov$x, em_gov$y, col = em_gov$colour, asp = 1, pch = 19, ylim = c(-2, 2.5), xlab = "", ylab = "", axes = FALSE)
+legend(-3,-0.3,parties_em,fill= color_em)
+par(oldmar)
+tab.title(label = "Seats in the East Midlands", tab.col = "#ccc1a8")
+```
+
+```{r echo=FALSE}
+wm_valid <- sum(west_midlands$`Valid votes`)
+wm_lab <- sum(west_midlands$Lab)
+wm_con <- sum(west_midlands$Con)
+wm_ld <- sum(west_midlands$LD)
+wm_gp <- sum(west_midlands$Green)
+wm_ruk <- sum(west_midlands$RUK)
+wm_total <- wm_valid - sum(west_midlands$`All other candidates`)
+parties_wm <- c("Labour (20)", "Conservative (17)", "Liberal Democrats (5)", "Greens (4)", "Reform UK (11)")
+votes_wm <- c(wm_lab, wm_con, wm_ld, wm_gp, wm_ruk)
+results_wm<- table(sainte_lague(votes_wm, 57))
+seats_wm <- c(20, 17, 5, 4, 11)
+wm <- data.frame(parties_wm, seats_wm)
+#knitr::kable(wm, col.names = c("Parties", "Seats in the West Midlands"))
+color_wm <- c("red", "blue", "orange", "green", "#10d2e5")
+alpha_color_wm <- c("blue", "green", "red", "orange", "#10d2e5" )
+seat_division_wm <- seats(57, 4)
+wm_gov <- election(seat_division_wm,wm, parties_wm ~ seats_wm, colours <- alpha_color_wm)
+oldmar<-par(mar=c(2,4,4,2))
+plot(wm_gov$x, wm_gov$y, col = wm_gov$colour, asp = 1, pch = 19, ylim = c(-2, 2.5), xlab = "", ylab = "", axes = FALSE)
+legend(-3,-0.3,parties_wm,fill= color_wm)
+par(oldmar)
+tab.title(label = "Seats in the West Midlands", tab.col = "#ccc1a8")
+```
+
+```{r echo=FALSE}
+l_valid <- sum(london$`Valid votes`)
+l_lab <- sum(london$Lab)
+l_con <- sum(london$Con)
+l_ld <- sum(london$LD)
+l_gp <- sum(london$Green)
+l_ruk <- sum(london$RUK)
+l_total <- l_valid - sum(london$`All other candidates`)
+parties_l <- c("Labour (35)", "Conservative (16)", "Liberal Democrats (9)", "Greens (8)", "Reform UK (7)")
+votes_l <- c(l_lab, l_con, l_ld, l_gp, l_ruk)
+results_l<- table(sainte_lague(votes_l, 75))
+seats_l <- c(35, 16, 9, 8, 7)
+l <- data.frame(parties_l, seats_l)
+#knitr::kable(l, col.names = c("Parties", "Seats in London"))
+color_l <- c("red", "blue", "orange", "green", "#10d2e5")
+alpha_color_l <- c("blue", "green", "red", "orange", "#10d2e5" )
+seat_division_l <- seats(75, 6)
+l_gov <- election(seat_division_l,l, parties_l ~ seats_l, colours <- alpha_color_l)
+oldmar<-par(mar=c(2,4,4,2))
+plot(l_gov$x, l_gov$y, col = l_gov$colour, asp = 1, pch = 19, ylim = c(-2, 2.5), xlab = "", ylab = "", axes = FALSE)
+legend(-3,-0.3,parties_l,fill= color_l)
+par(oldmar)
+tab.title(label = "Seats in London", tab.col = "#ccc1a8")
+```
+
+```{r echo=FALSE}
+w_valid <- sum(wales$`Valid votes`)
+w_lab <- sum(wales$Lab)
+w_con <- sum(wales$Con)
+w_ld <- sum(wales$LD)
+w_gp <- sum(wales$Green)
+w_ruk <- sum(wales$RUK)
+w_pc <- sum(wales$PC)
+w_total <- w_valid - sum(wales$`All other candidates`)
+parties_w <- c("Labour (13)", "Conservative (6)", "Liberal Democrats (2)", "Plaid Cymru (5)", "Reform UK (6)")
+votes_w <- c(w_lab, w_con, w_ld, w_pc, w_ruk)
+results_w<- table(sainte_lague(votes_w, 32))
+seats_w <- c(13, 6, 2, 5, 6)
+w <- data.frame(parties_w, seats_w)
+#knitr::kable(w, col.names = c("Parties", "Seats in Wales"))
+color_w <- c("red", "blue", "orange", "lightgreen", "#10d2e5")
+alpha_color_w <- c("blue", "red", "orange", "lightgreen", "#10d2e5" )
+seat_division_w <- seats(32, 3)
+w_gov <- election(seat_division_w,w, parties_w~ seats_w, colours <- alpha_color_w)
+oldmar<-par(mar=c(2,4,4,2))
+plot(w_gov$x, w_gov$y, col = w_gov$colour, asp = 1, pch = 19, ylim = c(-2, 2.5), xlab = "", ylab = "", axes = FALSE)
+legend(-3,-0.3,parties_w,fill= color_w)
+par(oldmar)
+tab.title(label = "Seats in Wales", tab.col = "#ccc1a8")
+```
+
+```{r echo=FALSE}
+s_valid <- sum(scotland$`Valid votes`)
+s_lab <- sum(scotland$Lab)
+s_con <- sum(scotland$Con)
+s_ld <- sum(scotland$LD)
+s_gp <- sum(scotland$Green)
+s_ruk <- sum(scotland$RUK)
+s_snp <- sum(scotland$SNP)
+s_total <- s_valid - sum(scotland$`All other candidates`)
+parties_s <- c("Labour (21)", "Conservative (8)", "Liberal Democrats (6)", "Scottish National Party (18)", "Reform UK (4)")
+votes_s <- c(s_lab, s_con, s_ld, s_snp, s_ruk)
+results_s<- table(sainte_lague(votes_s, 57))
+seats_s <- c(21, 8, 6, 18, 4)
+s <- data.frame(parties_s, seats_s)
+#knitr::kable(
+color_s <- c("red", "blue", "orange", "yellow", "#10d2e5")
+alpha_color_s<- c("blue", "red", "orange", "#10d2e5", "yellow" )
+seat_division_s <- seats(57, 4)
+s_gov <- election(seat_division_s,s, parties_s~ seats_s, colours <- alpha_color_s)
+oldmar<-par(mar=c(2,4,4,2))
+plot(s_gov$x, s_gov$y, col = s_gov$colour, asp = 1, pch = 19, ylim = c(-2, 2.5), xlab = "", ylab = "", axes = FALSE)
+legend(-3,-0.3,parties_s,fill= color_s)
+par(oldmar)
+tab.title(label = "Seats in Scotland", tab.col = "#ccc1a8")
+
+```
+
+```{r echo=FALSE}
+n_valid <- sum(northern_ireland$`Valid votes`)
+n_con <- sum(northern_ireland$Con)
+n_gp <- sum(northern_ireland$Green)
+n_ruk <- sum(northern_ireland$RUK)
+n_sf <- sum(northern_ireland$SF)
+n_dup <- sum(northern_ireland$DUP)
+n_sdlp <- sum(northern_ireland$SDLP)
+n_apni <- sum(northern_ireland$APNI)
+n_uup <- sum(northern_ireland$UUP)
+n_total <- n_valid - sum(northern_ireland$`All other candidates`)
+parties_n <- c("Alliance (3)", "Sinn Féin (6)", "Democratic Unionist (5)", "Social Democratic and Labour (2)", "Ulster Unionist (2)")
+votes_n <- c(n_apni, n_sf, n_dup, n_sdlp, n_uup)
+results_n<- table(sainte_lague(votes_n, 18))
+seats_n <- c(3, 6, 5, 2, 2)
+n <- data.frame(parties_n, seats_n)
+#knitr::kable(n, col.names = c("Parties", "Seats in Northern Ireland"))
+color_n <- c("gold", "#708238", "maroon", "darkgreen", "#0067A5")
+alpha_color_n<- c("gold", "maroon", "#708238", "darkgreen", "#0067A5")
+seat_division_n <- seats(18, 1)
+n_gov <- election(seat_division_n,n, parties_n~ seats_n, colours <- alpha_color_n)
+oldmar<-par(mar=c(2,4,4,2))
+plot(n_gov$x, n_gov$y, col = n_gov$colour, asp = 1, pch = 19, ylim = c(-2, 2.5), xlab = "", ylab = "", axes = FALSE)
+legend(-3,-0.3,parties_n,fill= color_n)
+par(oldmar)
+tab.title(label = "Seats in Northern Ireland", tab.col = "#ccc1a8")
+
+```
+
+We have computed the apportionment of seats across all 12 constituencies, so now we can tally them up and take a look at the new hypothetical parliament.
+
+```{r echo=FALSE}
+parties_with_seats <- c("Labour (231)", "Conservative (161)", "Liberal Democrats (80)", "Greens (40)", "Reform UK (97)", "Plaid Cymru (5)", "Scottish National Party (18)", "Alliance (3)", "Social Democratic and Labour (2)", "Ulster Unionist (2)", "Democratic Unionist (5)", "Sinn Féin (6)")
+p <- c("Labour", "Conservative", "Liberal Democrats", "Greens", "Reform UK", "Plaid Cymru", "Scottish National Party", "Alliance", "Social Democratic and Labour", "Ulster Unionist", "Democratic Unionist", "Sinn Féin")
+seats <- c(231, 161, 80, 40, 97, 5, 18, 3, 2, 2, 5, 6)
+cs <- c("red", "blue", "orange", "green", "#10d2e5", "lightgreen", "yellow", "#D4Af37", "darkgreen", "#0067A5", "maroon",  "#708238")
+alpha_cs <- c("#D4Af37", "blue", "maroon", "green", "red", "orange", "lightgreen", "#10d2e5", "yellow", "#708238", "darkgreen", "#0067A5")
+vote_share <- c(33.7, 23.7, 12.2, 6.4, 14.3, 0.7, 2.5, 0.4, 0.3, 0.3, 0.6, 0.7)
+uk <- data.frame(p, parties_with_seats, seats, vote_share)
+seat_division <- seats(650, 12)
+gov <- election(seat_division,uk, parties_with_seats~ seats, colours <- alpha_cs)
+oldmar<-par(mar=c(2,4,4,2))
+plot(gov$x, gov$y, col = gov$colour, asp = 1, pch = 19, ylim = c(-2, 2.5), xlab = "", ylab = "", axes = FALSE)
+legend(-1, -0.1,parties_with_seats,fill= cs, cex = 0.6)
+par(oldmar)
+tab.title(label = "Seats in the U.K Parliament (PR)", text.col = "blue",  tab.col = "red")
+# results <- data.frame()
+```
+
+To compare, here is a visualization of the current actual House of Commons of the U.K.
+
+```{r echo=FALSE}
+current_parties <- c("Labour (412)", "Conservative (121)", "Liberal Democrats (72)", "Greens (4)", "Reform UK (5)", "Plaid Cymru (4)", "Scottish National (9)", "Alliance (1)", "Social Democratic and Labour (2)", "Ulster Unionist (1)", "Democratic Unionist (5)", "Sinn Féin (7)", "Traditional Unionist (1)", "Independent (6)")
+seats_fptp <- c(412, 121, 72, 4, 5, 4, 9, 1, 2, 1 , 5, 7, 1, 6)
+cs_fptp <- c("red", "blue", "orange", "green", "#10d2e5", "lightgreen", "yellow", "#D4Af37", "darkgreen", "#0067A5", "maroon",  "#708238", "#40E0D0", "grey")
+alpha_cs_fptp <- c("#D4Af37", "blue", "maroon", "green","grey", "red", "orange", "lightgreen", "#10d2e5", "yellow", "#708238", "darkgreen", "#40E0D0","#0067A5")
+uk_fptp <- data.frame(current_parties, seats_fptp)
+seat_division_fptp <- seats(650, 12)
+gov_fptp <- election(seat_division_fptp,uk_fptp, current_parties~ seats_fptp, colours <- alpha_cs_fptp)
+oldmar<-par(mar=c(2,4,4,2))
+plot(gov_fptp$x, gov_fptp$y, col = gov_fptp$colour, asp = 1, pch = 19, ylim = c(-2, 2.5), xlab = "", ylab = "", axes = FALSE)
+legend(-1, -0.1, current_parties,fill= cs_fptp, cex = 0.5)
+par(oldmar)
+tab.title(label = "Seats in the U.K Parliament (FPTP)", text.col = "blue",  tab.col = "red")
+```
+
+Let's see how well the seat share represents the vote share in this system. 
+
+```{r echo=FALSE}
+uk <- mutate(uk, ss = (seats * 100) / 650 )
+# Will have to create a new data frame where two variables are categorical and one is continous
+party_rep <- c(rep(p,2))
+type_of_value <- c(rep("Seat Share", 12), rep("Vote Share", 12))
+value <- c(uk$ss, uk$vote_share)
+pr_seat_vs_vote <- data.frame(party_rep, type_of_value, value)
+pr_seat_vs_vote <- mutate(pr_seat_vs_vote, value = ifelse(type_of_value == "Seat Share", value * (-1), value * 1))
+pr_seat_vs_vote %>%mutate( 
+    value = ifelse(type_of_value=="Seat Share", - value, 
+                        value*1))%>% 
+    ggplot(aes(x = party_rep,y = value, fill=type_of_value)) +  
+    geom_bar(stat = "identity", position = "stack", width = 0.4) + coord_flip() +
+    theme(panel.background = element_rect(fill = "#ccc1a8",
+                                          colour = "#ccc1a8",
+                                          size = 0.5, linetype = "solid"),
+    panel.grid.major = element_line(colour = "black"),
+    panel.grid.minor = element_line(colour = "#3f4345")
+  ) + scale_fill_brewer(palette = "Dark2") + xlab("Parties") + ylab("Seat and Vote Share") + scale_fill_discrete(name = "Type of Share")
+
+
+```
+
+The length of the seat share bar and the vote share is roughly the same for each party, which was the main goal of this proportional representation system. 
+
+## Comparing the results across the two systems
+We already know that the closed-list proportional representation system results in a parliament that represents the vote share better than the First-Past-The-Post system. But how does this affect the individual parties? 
+```{r echo=FALSE}
+parties <- c("Labour", "Conservative", "Liberal Democrats", "Greens", "Reform UK", "Plaid Cymru", "Scottish National", "Alliance", "Social Democratic and Labour", "Ulster Unionist", "Democratic Unionist", "Sinn Féin", "Traditional Unionist", "Independent")
+
+seats_fptp <-  c(412, 121, 72, 4, 5, 4, 9, 1, 2, 1 , 5, 7, 1, 6)
+seats_pr <-  c(231, 161, 80, 40, 97, 5, 18, 3, 2, 2, 5, 6, 0, 0)
+vote_share <- c(33.7, 23.7, 12.2, 6.4, 14.3, 0.7, 2.5, 0.4, 0.3, 0.3, 0.6, 0.7, 0.2, 2.0)
+final <- data.frame(parties, vote_share, seats_fptp, seats_pr)
+final <- mutate(final, pseats_fptp = (seats_fptp * 100) / 650)
+final <- mutate(final, pseats_pr = (seats_pr * 100) / 650)
+final <- mutate(final, seat_difference = seats_pr - seats_fptp)
+final <- mutate(final, pseat_difference = pseats_pr - pseats_fptp)
+final <- mutate(final, percent_pf_previous_seats = (seat_difference * 100) / seats_fptp)
+seat_loss_table <- data.frame(final$parties, final$percent_pf_previous_seats)
+knitr::kable(x = seat_loss_table, col.names = c("Party", "% difference in seats from FPTP to PR"))
+
+```
+
+The table above shows that the entities hurt the most by a switch from FPTP to PR are those that fail to meet the electoral threshold in a region. In this case, we have the Traditional Unionist Party and various independent candidates, who were popular enough to gain enough votes in small constituencies, but are not popular enough in the entire region, and as a result lost all their seats. A possible solution to this might be to lower the electoral threshold.
+
+Furthermore, the Labour Party would also be hurt by this change, as they would lose 43% of their seats from FPTP. Generally, the party that wins the most seats in an FPTP system would always be the party that would be hurt by a switch to a more proportional system. This is why there is little incentive for a party in power to enact electoral reform. 
+
+While most other parties would see gains under a proportional system, the party that would gain the most would be the Reform UK. Recall that despite winning 14.3% of the vote in the election, the FPTP system only gave the Reform UK 5 seats, which is less than 1% of the total seats in parliament. Under a more proportional system, their seat count would skyrocket to 97 - a whopping 1840% increase. The Greens would enjoy a 900% increase in their seat count from 4 to 40, while the Scottish National Party would double their seat count from 9 to 18. Not much would change in Northern Ireland due to the relatively few number of seats in the country to begin with. 
+
+```{r echo=FALSE}
+pls <-  c("#D4Af37", "blue", "maroon", "green","grey", "red", "orange", "lightgreen", "#10d2e5", "yellow", "#708238", "darkgreen", "#40E0D0","#0067A5")
+ggplot(data = final, mapping = aes(x = parties, y = pseat_difference, fill = parties)) + geom_bar(stat= "identity", width = 0.4) + scale_fill_manual(name = "Parties", values= pls) + labs(x = "Parties", 
+       y = "Percentage of Parliament Gained/Lost ") +
+ theme(panel.background = element_rect(fill = "#ccc1a8",
+                                          colour = "#ccc1a8",
+                                          size = 0.5, linetype = "solid"),
+    panel.grid.major = element_line(colour = "black"),
+    panel.grid.minor = element_line(colour = "#3f4345"),
+    axis.text.x = element_blank()
+  ) 
+```
+
+Note that the SDLP and DUP are at 0 because their seat count did not change. The graph shows that the Labour would lose the most power in parliament, while Reform UK more gain the most power. The Greens would also gain a significant amount of power. This means that these smaller parties will have more impact on policy and legislation, and they will have more control over the ruling party, with the ruling party being forced to find parties they can work with to get enough votes for a decision. Furthermore, it is probable that people are more likely to vote for smaller parties as they would be less worried about preventing a party they don't like from getting seats.
+
+There are a couple of cons that are visible here. As mentioned before, it would be very difficult for an independent candidate to reach the electoral threshold in a region, unless the candidate was already very popular. This means independent voters are highly unlikely to have any representation. Another possible issue is that with local constituencies merging to form regions, the idea of local representation disappears. This could be another argument for far more constituencies than 12. Even then, it will be logistically harder to reach individual localities. 
+
+
+Nevertheless under this new system, Keir Starmer's Labour Party would still win the election comfortably, but with significantly reduced power. The debate of a minority government vs majority government is a different one altogether, but one may argue that a minority government would help keeping the ruling party in check, and force cooperation among various factions of parliament. 
+
+There are a couple of cons that are visible here. As mentioned before, it would be very difficult for an independent candidate to reach the electoral threshold in a region, unless the candidate was already very popular. This means independent voters are highly unlikely to have any representation. Another possible issue is that with local constituencies merging to form regions, the idea of local representation disappears. This could be another argument for far more constituencies than 12.
+
